@@ -1,26 +1,45 @@
 use anyhow::{Error, Result};
-use serde_json;
 use serde_json::{Number, Value};
 use std::{env, process::exit};
 
-fn decode_bencoded_value(encoded_value: &str) -> Result<serde_json::Value> {
+fn decode_bencoded_value(encoded_value: &str) -> Result<(&str, Value)> {
+    println!("Encoded {}", encoded_value);
     let Some(first_char) = encoded_value.chars().next() else {
         return Err(Error::msg(format!("Empty encoded value {}", encoded_value)));
     };
     match first_char {
         'i' => encoded_value[1..]
-            .strip_suffix("e")
+            .split_once('e')
             .ok_or_else(|| Error::msg("Bencode integer must ends with e"))
-            .and_then(|num| num.parse::<i64>().map_err(Error::from))
-            .map(|num| Value::Number(Number::from(num))),
-        _ if first_char.is_digit(10) => encoded_value
-            .split_once(":")
-            .and_then(|(length, string)| {
+            .and_then(|(num, rest)| {
+                num.parse::<i64>()
+                    .map_err(Error::from)
+                    .map(|num| Value::Number(Number::from(num)))
+                    .map(|num| (rest, num))
+            }),
+        'l' => {
+            let mut values = vec![];
+            let mut rest = &encoded_value[1..];
+            while !rest.starts_with('e') {
+                let (encoded_value, value) = decode_bencoded_value(rest)?;
+                rest = encoded_value;
+                values.push(value);
+            }
+            Ok((&rest[1..], Value::Array(values)))
+        }
+        _ if first_char.is_ascii_digit() => encoded_value
+            .split_once(':')
+            .and_then(|(length, rest)| {
                 let length = length.parse::<usize>().ok()?;
-                Some(serde_json::Value::String(string[0..length].to_string()))
+                Some((
+                    &rest[length..],
+                    serde_json::Value::String(rest[0..length].to_string()),
+                ))
             })
-            .ok_or_else(|| Error::msg("Invalid encoded string {encoded_value}")),
-        _ => Err(Error::msg("Unexpected bencode value {encoded_value}")),
+            .ok_or_else(|| Error::msg(format!("Invalid encoded string {encoded_value}"))),
+        _ => Err(Error::msg(format!(
+            "Unexpected bencode value {encoded_value}"
+        ))),
     }
 }
 // Usage: your_bittorrent.sh decode "<encoded_value>"
@@ -34,8 +53,8 @@ fn main() -> Result<()> {
 
     if command == "decode" {
         let encoded_value = &args[2];
-        let decoded_value = decode_bencoded_value(encoded_value)?;
-        println!("{}", decoded_value.to_string());
+        let (_, decoded_value) = decode_bencoded_value(encoded_value)?;
+        println!("{}", decoded_value);
     } else {
         println!("unknown command: {}", args[1])
     }

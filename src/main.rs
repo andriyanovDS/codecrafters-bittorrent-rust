@@ -3,7 +3,6 @@ use serde_json::{Number, Value};
 use std::{env, process::exit};
 
 fn decode_bencoded_value(encoded_value: &str) -> Result<(&str, Value)> {
-    println!("Encoded {}", encoded_value);
     let Some(first_char) = encoded_value.chars().next() else {
         return Err(Error::msg(format!("Empty encoded value {}", encoded_value)));
     };

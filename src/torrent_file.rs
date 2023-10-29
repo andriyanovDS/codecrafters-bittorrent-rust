@@ -47,6 +47,11 @@ impl Display for TorrentFile {
             "Info Hash: {}",
             hex::encode(self.info.hash().expect("Unable to hash info"))
         )?;
+        writeln!(f, "Piece Length: {}", self.info.piece_length)?;
+        writeln!(f, "Piece Hashes:")?;
+        for piece in &self.info.pieces {
+            writeln!(f, "{}", hex::encode(piece.0))?;
+        }
         Ok(())
     }
 }

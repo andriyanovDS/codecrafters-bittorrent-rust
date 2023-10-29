@@ -1,10 +1,10 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-use torrent_info::TorrentFile;
+use torrent_file::TorrentFile;
 
 mod decode;
-mod torrent_info;
+mod torrent_file;
 
 #[derive(Parser, Debug)]
 struct Cli {

@@ -9,24 +9,24 @@ use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Deserialize)]
 pub struct TorrentFile {
-    announce: String,
-    info: Info,
+    pub announce: String,
+    pub info: Info,
 }
 
 const PIECE_LEN: usize = 20;
 
 #[derive(Debug, Serialize)]
-struct Piece([u8; PIECE_LEN]);
+pub struct Piece([u8; PIECE_LEN]);
 
 #[derive(Deserialize, Serialize, Debug)]
-struct Info {
-    length: usize,
-    name: String,
+pub struct Info {
+    pub length: usize,
+    pub name: String,
     #[serde(rename = "piece length")]
-    piece_length: usize,
+    pub piece_length: usize,
     #[serde(deserialize_with = "deserialize_piece")]
     #[serde(serialize_with = "serialize_piece")]
-    pieces: Vec<Piece>,
+    pub pieces: Vec<Piece>,
 }
 
 impl<'a> IntoIterator for &'a Piece {
@@ -45,7 +45,7 @@ impl Display for TorrentFile {
         writeln!(
             f,
             "Info Hash: {}",
-            hex::encode(self.info.hash().expect("Unable to hash info"))
+            hex::encode(self.info.hash().expect("Unable to hash info").0)
         )?;
         writeln!(f, "Piece Length: {}", self.info.piece_length)?;
         writeln!(f, "Piece Hashes:")?;
@@ -56,13 +56,16 @@ impl Display for TorrentFile {
     }
 }
 
+const INFO_HASH_SIZE: usize = 20;
+pub struct InfoHash(pub [u8; INFO_HASH_SIZE]);
+
 impl Info {
-    fn hash(&self) -> Result<[u8; 20]> {
+    pub fn hash(&self) -> Result<InfoHash> {
         let encoded_info = serde_bencode::to_bytes(self)?;
         let mut hasher = Sha1::new();
         hasher.update(&encoded_info);
         let result = hasher.finalize();
-        Ok(result.try_into().expect("Unable to hash info"))
+        Ok(InfoHash(result.try_into().expect("Unable to hash info")))
     }
 }
 
@@ -106,7 +109,7 @@ where
     deserializer.deserialize_seq(visitor)
 }
 
-fn serialize_piece<S>(piece: &Vec<Piece>, s: S) -> Result<S::Ok, S::Error>
+fn serialize_piece<S>(piece: &[Piece], s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {

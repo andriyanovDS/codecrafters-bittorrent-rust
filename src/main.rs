@@ -5,6 +5,7 @@ use torrent_file::TorrentFile;
 
 mod decode;
 mod torrent_file;
+mod tracker;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -16,9 +17,11 @@ struct Cli {
 enum Command {
     Decode { encoded_value: String },
     Info { file_path: PathBuf },
+    Peers { file_path: PathBuf },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
     match &cli.command {
         Command::Decode { encoded_value } => {
@@ -29,6 +32,19 @@ fn main() -> Result<()> {
             let file = std::fs::read(file_path)?;
             let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
             println!("{torrent}");
+        }
+        Command::Peers { file_path } => {
+            let file = std::fs::read(file_path)?;
+            let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
+            let peers = tracker::discover_peers(
+                torrent.announce.as_str(),
+                torrent.info.hash()?,
+                torrent.info.length,
+            )
+            .await?;
+            for peer in peers {
+                println!("{}", peer.0);
+            }
         }
     }
     Ok(())

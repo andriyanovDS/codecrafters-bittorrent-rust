@@ -18,7 +18,6 @@ enum Command {
     Info { file_path: PathBuf },
 }
 
-// Usage: your_bittorrent.sh decode "<encoded_value>"
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match &cli.command {

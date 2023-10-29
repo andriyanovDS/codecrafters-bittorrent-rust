@@ -1,5 +1,5 @@
 use anyhow::{Error, Result};
-use serde_json::{Number, Value};
+use serde_json::{Map, Number, Value};
 use std::{env, process::exit};
 
 fn decode_bencoded_value(encoded_value: &str) -> Result<(&str, Value)> {
@@ -25,6 +25,24 @@ fn decode_bencoded_value(encoded_value: &str) -> Result<(&str, Value)> {
                 values.push(value);
             }
             Ok((&rest[1..], Value::Array(values)))
+        }
+        'd' => {
+            let mut map = Map::new();
+            let mut rest = &encoded_value[1..];
+            while !rest.starts_with('e') {
+                let (encoded_value, key) = decode_bencoded_value(rest)?;
+                rest = encoded_value;
+                if let Value::String(key) = key {
+                    let (encoded_value, value) = decode_bencoded_value(rest)?;
+                    map.insert(key, value);
+                    rest = encoded_value;
+                } else {
+                    return Err(Error::msg(format!(
+                        "Bencode dictinary key must be a string. Value: {encoded_value}"
+                    )));
+                }
+            }
+            Ok((&rest[1..], Value::Object(map)))
         }
         _ if first_char.is_ascii_digit() => encoded_value
             .split_once(':')

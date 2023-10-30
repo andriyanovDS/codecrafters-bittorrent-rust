@@ -1,3 +1,4 @@
+use crate::torrent_file::InfoHash;
 use anyhow::Result;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use std::{
@@ -5,8 +6,6 @@ use std::{
     marker::PhantomData,
     net::{Ipv4Addr, SocketAddrV4},
 };
-
-use crate::torrent_file::InfoHash;
 
 #[derive(Debug, Serialize)]
 struct TrackerRequest {

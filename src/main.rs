@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
             let file = std::fs::read(file_path)?;
             let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
             let peer_id = handshake(&torrent.info.hash()?, *b"00112233445566778899", peer).await?;
-            println!("{peer_id}");
+            println!("Peer ID: {peer_id}");
         }
     }
     Ok(())

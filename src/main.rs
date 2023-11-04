@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use peer::handshake;
+use peer::{download_peice, handshake};
 use std::{net::SocketAddrV4, path::PathBuf};
 use torrent_file::TorrentFile;
 
@@ -16,6 +16,7 @@ struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
+#[clap(rename_all = "snake_case")]
 enum Command {
     Decode {
         encoded_value: String,
@@ -29,6 +30,12 @@ enum Command {
     Handshake {
         file_path: PathBuf,
         peer: SocketAddrV4,
+    },
+    DownloadPiece {
+        #[arg(short)]
+        output: PathBuf,
+        file_path: PathBuf,
+        piece: usize,
     },
 }
 
@@ -48,12 +55,10 @@ async fn main() -> Result<()> {
         Command::Peers { file_path } => {
             let file = std::fs::read(file_path)?;
             let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
-            let peers = tracker::discover_peers(
-                torrent.announce.as_str(),
-                torrent.info.hash()?,
-                torrent.info.length,
-            )
-            .await?;
+            let info_hash = torrent.info.hash()?;
+            let peers =
+                tracker::discover_peers(torrent.announce.as_str(), &info_hash, torrent.info.length)
+                    .await?;
             for peer in peers {
                 println!("{}", peer.0);
             }
@@ -61,8 +66,20 @@ async fn main() -> Result<()> {
         Command::Handshake { file_path, peer } => {
             let file = std::fs::read(file_path)?;
             let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
-            let peer_id = handshake(&torrent.info.hash()?, *b"00112233445566778899", peer).await?;
+            let mut stream = tokio::net::TcpStream::connect(peer).await?;
+            let peer_id = handshake(&torrent.info.hash()?, &mut stream).await?;
             println!("Peer ID: {peer_id}");
+        }
+        Command::DownloadPiece {
+            output,
+            file_path,
+            piece: piece_index,
+        } => {
+            let file = std::fs::read(file_path)?;
+            let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
+            let piece = download_peice(&torrent, *piece_index).await?;
+            std::fs::write(output, &piece)?;
+            println!("Piece {piece_index} downloaded to {output:?}");
         }
     }
     Ok(())

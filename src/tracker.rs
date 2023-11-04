@@ -25,7 +25,7 @@ struct TrackerResponse {
 
 pub async fn discover_peers(
     announce: &str,
-    info_hash: InfoHash,
+    info_hash: &InfoHash,
     file_size: usize,
 ) -> Result<Vec<Peer>> {
     let request = TrackerRequest {

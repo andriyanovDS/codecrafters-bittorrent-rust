@@ -15,8 +15,17 @@ pub struct TorrentFile {
 
 const PIECE_LEN: usize = 20;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub struct Piece([u8; PIECE_LEN]);
+
+impl From<&[u8]> for Piece {
+    fn from(value: &[u8]) -> Self {
+        let mut hasher = Sha1::new();
+        hasher.update(value);
+        let result = hasher.finalize();
+        Self(result.try_into().expect("Unable to hash piece"))
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Info {

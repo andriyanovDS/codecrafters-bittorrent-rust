@@ -5,10 +5,10 @@ use bytes::Buf;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-const PEER_ID: [u8; 20] = *b"00112233445566778899";
+pub const PEER_ID: [u8; 20] = *b"00112233445566778899";
 
 #[repr(C)]
-struct Handshake {
+pub struct Handshake {
     protocol_len: u8,
     protocol: [u8; 19],
     reserved: [u8; 8],
@@ -18,7 +18,7 @@ struct Handshake {
 
 #[repr(u8)]
 #[derive(PartialEq, Debug)]
-enum MessageType {
+pub enum MessageType {
     Choke,
     Unchoke,
     Interested,
@@ -63,15 +63,15 @@ impl Into<u8> for MessageType {
     }
 }
 
-trait BytesConvertible {
+pub trait BytesConvertible {
     fn as_bytes(&self) -> &[u8];
 }
 
-trait TryFromBytes: Sized {
+pub trait TryFromBytes: Sized {
     fn try_from_bytes(bytes: Vec<u8>) -> Result<Self>;
 }
 
-struct EmptyPayload;
+pub struct EmptyPayload;
 const EMPTY_SLICE: &'static [u8; 0] = &[];
 
 impl BytesConvertible for EmptyPayload {
@@ -87,16 +87,26 @@ impl TryFromBytes for EmptyPayload {
     }
 }
 
-struct Message<Payload> {
-    message_type: MessageType,
-    payload: Payload,
+pub struct Message<Payload> {
+    pub message_type: MessageType,
+    pub payload: Payload,
 }
 
 #[repr(C)]
-struct RequestPayload {
+pub struct RequestPayload {
     index: [u8; 4],
     begin: [u8; 4],
     length: [u8; 4],
+}
+
+impl RequestPayload {
+    pub fn new(index: usize, begin: usize, length: usize) -> Self {
+        Self {
+            index: (index as i32).to_be_bytes(),
+            begin: (begin as i32).to_be_bytes(),
+            length: (length as i32).to_be_bytes(),
+        }
+    }
 }
 
 impl BytesConvertible for RequestPayload {
@@ -108,10 +118,10 @@ impl BytesConvertible for RequestPayload {
 }
 
 #[repr(C)]
-struct Piece {
+pub struct Piece {
     index: [u8; 4],
     begin: [u8; 4],
-    block: Vec<u8>,
+    pub block: Vec<u8>,
 }
 
 impl TryFromBytes for Piece {
@@ -130,7 +140,18 @@ impl TryFromBytes for Piece {
     }
 }
 
-struct Bitfield(Vec<u8>);
+#[derive(Debug)]
+pub struct Bitfield(Vec<u8>);
+
+impl Bitfield {
+    pub fn has_piece(&self, piece_index: usize) -> bool {
+        let byte_index = piece_index / 8;
+        let bit_index = piece_index % 8;
+        assert!(byte_index < self.0.len());
+        let byte = self.0[byte_index];
+        (byte << bit_index) & 128 == 128
+    }
+}
 
 impl TryFromBytes for Bitfield {
     fn try_from_bytes(bytes: Vec<u8>) -> Result<Self> {
@@ -139,7 +160,7 @@ impl TryFromBytes for Bitfield {
 }
 
 impl Handshake {
-    fn new(info_hash: &InfoHash, peer_id: [u8; 20]) -> Self {
+    pub fn new(info_hash: &InfoHash, peer_id: [u8; 20]) -> Self {
         Self {
             protocol_len: 19,
             protocol: *b"BitTorrent protocol",
@@ -149,7 +170,7 @@ impl Handshake {
         }
     }
 
-    fn as_bytes_mut(&mut self) -> &mut [u8] {
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
         let bytes = self as *mut Self as *mut [u8; std::mem::size_of::<Self>()];
         // Safety: Handshake is a POD with repr(c)
         let bytes: &mut [u8; std::mem::size_of::<Self>()] = unsafe { &mut *bytes };
@@ -254,15 +275,10 @@ async fn request_peice(
 ) -> Result<Vec<u8>> {
     let mut offset = 0;
     let piece_size = size.min(file_length - piece_index * size);
-    let piece_index = piece_index as i32;
     let mut buffer = Vec::with_capacity(piece_size);
     while offset < piece_size {
         let block_size = (piece_size - offset).min(CHUNK_SIZE);
-        let payload = RequestPayload {
-            index: piece_index.to_be_bytes(),
-            begin: (offset as i32).to_be_bytes(),
-            length: (block_size as i32).to_be_bytes(),
-        };
+        let payload = RequestPayload::new(piece_index, offset, block_size);
         send_message(
             Message {
                 message_type: MessageType::Request,

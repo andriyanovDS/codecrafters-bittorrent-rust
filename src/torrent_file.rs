@@ -66,6 +66,7 @@ impl Display for TorrentFile {
 }
 
 const INFO_HASH_SIZE: usize = 20;
+#[derive(Debug, Clone)]
 pub struct InfoHash(pub [u8; INFO_HASH_SIZE]);
 
 impl Info {

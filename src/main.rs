@@ -4,7 +4,10 @@ use peer::{download_peice, handshake};
 use std::{net::SocketAddrV4, path::PathBuf};
 use torrent_file::TorrentFile;
 
+use crate::file_download::download_file;
+
 mod decode;
+mod file_download;
 mod peer;
 mod torrent_file;
 mod tracker;
@@ -36,6 +39,11 @@ enum Command {
         output: PathBuf,
         file_path: PathBuf,
         piece: usize,
+    },
+    Download {
+        #[arg(short)]
+        output: PathBuf,
+        file_path: PathBuf,
     },
 }
 
@@ -80,6 +88,12 @@ async fn main() -> Result<()> {
             let piece = download_peice(&torrent, *piece_index).await?;
             std::fs::write(output, &piece)?;
             println!("Piece {piece_index} downloaded to {output:?}");
+        }
+        Command::Download { output, file_path } => {
+            let file = std::fs::read(file_path)?;
+            let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
+            download_file(torrent, output).await?;
+            println!("Downloaded {file_path:?} to {output:?}");
         }
     }
     Ok(())

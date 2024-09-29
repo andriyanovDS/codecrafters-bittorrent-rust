@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use magnet_link::MagnetLink;
 use peer::{download_peice, handshake};
 use std::{net::SocketAddrV4, path::PathBuf};
 use torrent_file::TorrentFile;
@@ -11,6 +12,7 @@ mod file_download;
 mod peer;
 mod torrent_file;
 mod tracker;
+mod magnet_link;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -45,6 +47,9 @@ enum Command {
         output: PathBuf,
         file_path: PathBuf,
     },
+    MagnetParse {
+        link: String,
+    }
 }
 
 #[tokio::main]
@@ -94,6 +99,13 @@ async fn main() -> Result<()> {
             let torrent = serde_bencode::from_bytes::<TorrentFile>(&file)?;
             download_file(torrent, output).await?;
             println!("Downloaded {file_path:?} to {output:?}");
+        },
+        Command::MagnetParse { link } => {
+            let magnet_link = MagnetLink::parse(link.as_str())?;
+            for tracker in magnet_link.tracker_address {
+                println!("Tracker URL: {tracker}");
+            }
+            println!("Info Hash: {}", magnet_link.info_hash.hash);
         }
     }
     Ok(())
